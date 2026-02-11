@@ -19,6 +19,19 @@ local M = {}
 
 local dbg = require('diffs.log').dbg
 
+---@type integer
+M._scratch_buf = nil
+
+function M.scratch_buf()
+  local buf = M._scratch_buf
+  if not (buf and vim.api.nvim_buf_is_valid(buf)) then
+    buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_name(buf, 'diffs_scratch')
+    M._scratch_buf = buf
+  end
+  return buf
+end
+
 ---@param filepath string
 ---@param n integer
 ---@return string[]?
@@ -43,11 +56,13 @@ end
 ---@param repo_root string?
 ---@return string?
 local function get_ft_from_filename(filename, repo_root)
+  local buf ---@type integer?
   if repo_root then
     local full_path = vim.fs.joinpath(repo_root, filename)
 
-    local buf = vim.fn.bufnr(full_path)
-    if buf ~= -1 then
+    buf = vim.fn.bufnr(full_path)
+    buf = buf ~= -1 and buf or nil
+    if buf then
       local ft = vim.api.nvim_get_option_value('filetype', { buf = buf })
       if ft and ft ~= '' then
         dbg('filetype from existing buffer %d: %s', buf, ft)
@@ -56,7 +71,11 @@ local function get_ft_from_filename(filename, repo_root)
     end
   end
 
-  local ft = vim.filetype.match({ filename = filename })
+  buf = buf or M.scratch_buf()
+  local ft = vim.api.nvim_buf_call(buf, function()
+    return vim.filetype.match({ filename = filename, buf = buf })
+  end)
+
   if ft then
     dbg('filetype from filename: %s', ft)
     return ft

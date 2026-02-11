@@ -538,7 +538,7 @@ function M.attach(bufnr)
 
   local debounced = create_debounced_highlight(bufnr)
 
-  highlight_buffer(bufnr)
+  -- highlight_buffer(bufnr)
 
   vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI' }, {
     buffer = bufnr,
@@ -553,13 +553,14 @@ function M.attach(bufnr)
     end,
   })
 
-  vim.api.nvim_create_autocmd('BufReadPost', {
-    buffer = bufnr,
-    callback = function()
-      dbg('BufReadPost event, re-highlighting buffer %d', bufnr)
-      highlight_buffer(bufnr)
-    end,
-  })
+  -- vim.api.nvim_create_autocmd('BufReadPost', {
+  --   buffer = bufnr,
+  --   callback = vim.schedule_wrap(function()
+  --     -- pp('bufread')
+  --     dbg('BufReadPost event, re-highlighting buffer %d', bufnr)
+  --     -- highlight_buffer(bufnr)
+  --   end),
+  -- })
 
   vim.api.nvim_create_autocmd('BufWipeout', {
     buffer = bufnr,
