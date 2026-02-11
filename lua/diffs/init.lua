@@ -184,14 +184,19 @@ local function highlight_buffer(bufnr)
 
   vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
 
+  local now = vim.uv.hrtime()
+  ll(('starting hl buf %d'):format(bufnr))
   local hunks = parser.parse_buffer(bufnr)
-  dbg('found %d hunks in buffer %d', #hunks, bufnr)
+  local now2 = vim.uv.hrtime()
+  ll(('parsed %d hunks in %.2f ms'):format(#hunks, (now2 - now) / 1e6))
   for _, hunk in ipairs(hunks) do
+    -- TODO: increamental/aync apply hl here
     highlight.highlight_hunk(bufnr, ns, hunk, {
       hide_prefix = config.hide_prefix,
       highlights = config.highlights,
     })
   end
+  ll(('finish hl buf %d in %.2fms'):format(bufnr, (vim.uv.hrtime() - now2) / 1e6))
 end
 
 ---@param bufnr integer
