@@ -189,13 +189,56 @@ local function highlight_buffer(bufnr)
   local hunks = parser.parse_buffer(bufnr)
   local now2 = vim.uv.hrtime()
   ll(('parsed %d hunks in %.2f ms'):format(#hunks, (now2 - now) / 1e6))
-  for _, hunk in ipairs(hunks) do
-    -- TODO: increamental/aync apply hl here
+  local line = unpack(vim.api.nvim_win_get_cursor(0))
+  ---@diagnostic disable-next-line: missing-fields
+  local id = vim.list.bisect(hunks, { start_line = line }, {
+    key = function(h)
+      return h.start_line
+    end,
+  })
+
+  local seen = {}
+  for i = math.max(1, id - 5), math.min(id + 5, #hunks) do
+    local hunk = hunks[i]
     highlight.highlight_hunk(bufnr, ns, hunk, {
       hide_prefix = config.hide_prefix,
       highlights = config.highlights,
     })
+    seen[i] = true
   end
+
+  -- TODO:
+  -- 1. chunk the job
+  -- 2. decro provider/ephormal mark?
+  vim.defer_fn(function()
+    for i = 1, math.max(1, id - 5) do
+      if not seen[i] then
+        local hunk = hunks[i]
+        highlight.highlight_hunk(bufnr, ns, hunk, {
+          hide_prefix = config.hide_prefix,
+          highlights = config.highlights,
+        })
+        seen[i] = true
+      end
+    end
+    for i = math.min(id + 5, #hunks), #hunks do
+      if not seen[i] then
+        local hunk = hunks[i]
+        highlight.highlight_hunk(bufnr, ns, hunk, {
+          hide_prefix = config.hide_prefix,
+          highlights = config.highlights,
+        })
+        seen[i] = true
+      end
+    end
+  end, 100)
+
+  -- for _, hunk in ipairs(hunks) do
+  --   highlight.highlight_hunk(bufnr, ns, hunk, {
+  --     hide_prefix = config.hide_prefix,
+  --     highlights = config.highlights,
+  --   })
+  -- end
   ll(('finish hl buf %d in %.2fms'):format(bufnr, (vim.uv.hrtime() - now2) / 1e6))
 end
 
@@ -547,10 +590,10 @@ function M.attach(bufnr)
 
   vim.api.nvim_create_autocmd('Syntax', {
     buffer = bufnr,
-    callback = function()
+    callback = vim.schedule_wrap(function()
       dbg('syntax event, re-highlighting buffer %d', bufnr)
       highlight_buffer(bufnr)
-    end,
+    end),
   })
 
   -- vim.api.nvim_create_autocmd('BufReadPost', {
