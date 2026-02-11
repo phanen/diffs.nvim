@@ -189,49 +189,90 @@ local function highlight_buffer(bufnr)
   local hunks = parser.parse_buffer(bufnr)
   local now2 = vim.uv.hrtime()
   ll(('parsed %d hunks in %.2f ms'):format(#hunks, (now2 - now) / 1e6))
-  local line = unpack(vim.api.nvim_win_get_cursor(0))
-  ---@diagnostic disable-next-line: missing-fields
-  local id = vim.list.bisect(hunks, { start_line = line }, {
-    key = function(h)
-      return h.start_line
+
+  local seen_lnum = {}
+  local seen_hunk = {}
+  vim.api.nvim_set_decoration_provider(vim.api.nvim_create_namespace('diffs'), {
+    -- on_start = function(_, tick)
+    --   -- dd('!!!!!!!!!!')
+    --   -- return true
+    -- end,
+    -- on_buf = function(_, buf, _)
+    on_win = function(_, win, buf, _)
+      if bufnr ~= buf then
+        return
+      end
+      local lnum = unpack(vim.api.nvim_win_get_cursor(0))
+      if seen_lnum[lnum] then
+        return
+      end
+      seen_lnum[lnum] = true
+      -- TODO: this can be slow if repeatly run
+      local id = vim.list.bisect(hunks, { start_line = lnum }, {
+        key = function(h)
+          return h.start_line
+        end,
+      })
+      if not id or seen_hunk[id] then
+        return
+      end
+      for i = math.max(1, id - 5), math.min(id + 5, #hunks) do
+        if not seen_hunk[i] then
+          local hunk = hunks[i]
+          highlight.highlight_hunk(bufnr, ns, hunk, {
+            hide_prefix = config.hide_prefix,
+            highlights = config.highlights,
+          })
+          seen_hunk[i] = true
+        end
+      end
     end,
   })
-
-  local seen = {}
-  for i = math.max(1, id - 5), math.min(id + 5, #hunks) do
-    local hunk = hunks[i]
-    highlight.highlight_hunk(bufnr, ns, hunk, {
-      hide_prefix = config.hide_prefix,
-      highlights = config.highlights,
+  if false then
+    local line = unpack(vim.api.nvim_win_get_cursor(0))
+    ---@diagnostic disable-next-line: missing-fields
+    local id = vim.list.bisect(hunks, { start_line = line }, {
+      key = function(h)
+        return h.start_line
+      end,
     })
-    seen[i] = true
-  end
 
-  -- TODO:
-  -- 1. chunk the job
-  -- 2. decro provider/ephormal mark?
-  vim.defer_fn(function()
-    for i = 1, math.max(1, id - 5) do
-      if not seen[i] then
-        local hunk = hunks[i]
-        highlight.highlight_hunk(bufnr, ns, hunk, {
-          hide_prefix = config.hide_prefix,
-          highlights = config.highlights,
-        })
-        seen[i] = true
-      end
+    local seen = {}
+    for i = math.max(1, id - 5), math.min(id + 5, #hunks) do
+      local hunk = hunks[i]
+      highlight.highlight_hunk(bufnr, ns, hunk, {
+        hide_prefix = config.hide_prefix,
+        highlights = config.highlights,
+      })
+      seen[i] = true
     end
-    for i = math.min(id + 5, #hunks), #hunks do
-      if not seen[i] then
-        local hunk = hunks[i]
-        highlight.highlight_hunk(bufnr, ns, hunk, {
-          hide_prefix = config.hide_prefix,
-          highlights = config.highlights,
-        })
-        seen[i] = true
+
+    -- TODO:
+    -- 1. chunk the job
+    -- 2. decro provider/ephormal mark?
+    vim.defer_fn(function()
+      for i = 1, math.max(1, id - 5) do
+        if not seen[i] then
+          local hunk = hunks[i]
+          highlight.highlight_hunk(bufnr, ns, hunk, {
+            hide_prefix = config.hide_prefix,
+            highlights = config.highlights,
+          })
+          seen[i] = true
+        end
       end
-    end
-  end, 100)
+      for i = math.min(id + 5, #hunks), #hunks do
+        if not seen[i] then
+          local hunk = hunks[i]
+          highlight.highlight_hunk(bufnr, ns, hunk, {
+            hide_prefix = config.hide_prefix,
+            highlights = config.highlights,
+          })
+          seen[i] = true
+        end
+      end
+    end, 100)
+  end
 
   -- for _, hunk in ipairs(hunks) do
   --   highlight.highlight_hunk(bufnr, ns, hunk, {
