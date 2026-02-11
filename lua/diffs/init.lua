@@ -118,7 +118,7 @@ local default_config = {
     },
     treesitter = {
       enabled = true,
-      max_lines = 500,
+      max_lines = 5000,
     },
     vim = {
       enabled = false,
