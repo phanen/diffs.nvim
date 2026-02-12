@@ -608,6 +608,8 @@ local function init()
   })
 end
 
+M.highlight_buffer = highlight_buffer
+
 ---@param bufnr? integer
 function M.attach(bufnr)
   init()

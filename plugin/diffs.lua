@@ -11,6 +11,12 @@ vim.api.nvim_create_autocmd('BufReadCmd', {
     require('diffs').attach(args.buf)
   end,
 })
+vim.api.nvim_create_autocmd('SessionLoadPost', {
+  pattern = 'fugitive://*',
+  callback = function(args)
+    require('diffs').highlight_buffer(args.buf)
+  end,
+})
 
 vim.api.nvim_create_autocmd('BufReadCmd', {
   pattern = 'diffs://*',
